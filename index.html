@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+
+  <head>
+    <meta charset="UTF-8">
+    <title>FINAL APPP</title>
+    <link rel="stylesheet" href="/style.css">
+  </head>
+
+  <body>
+    <!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>JurisDopamina Ultra - Memorización Pro</title>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
+    <style>
+        :root { --bg: #0a0a0a; --panel: #161616; --gold: #ffcc00; --text: #ffffff; --success: #00ff88; --error: #ff3333; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; display: flex; justify-content: center; }
+        #app { width: 100%; max-width: 850px; }
+        h1 { color: var(--gold); text-align: center; font-size: 2.5rem; text-shadow: 0 0 15px rgba(255,204,0,0.3); }
+        .panel { background: var(--panel); border: 2px solid #333; border-radius: 20px; padding: 30px; margin-bottom: 20px; }
+        .btn { padding: 15px 25px; border-radius: 12px; cursor: pointer; font-weight: bold; border: none; font-size: 1.1rem; transition: 0.2s; margin: 5px; display: inline-flex; align-items: center; gap: 10px; }
+        .btn-gold { background: var(--gold); color: black; box-shadow: 0 4px 15px rgba(255,204,0,0.2); }
+        .btn-outline { background: transparent; border: 1px solid #444; color: #aaa; }
+        .btn-danger { background: #221111; color: #ff5555; }
+        textarea { width: 100%; height: 180px; background: #111; color: #00ff88; border: 1px solid #444; border-radius: 15px; padding: 15px; font-family: monospace; font-size: 1rem; margin-top: 15px; }
+        .screen { display: none; animation: fadeIn 0.4s; }
+        .active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .q-card { font-size: 2.2rem; font-weight: bold; text-align: center; margin: 40px 0; min-height: 120px; }
+        .opt-btn { width: 100%; padding: 22px; margin-bottom: 15px; background: #222; color: white; border: 2px solid #333; border-radius: 18px; font-size: 1.3rem; text-align: left; cursor: pointer; transition: 0.2s; }
+        .opt-btn:hover { border-color: var(--gold); transform: scale(1.01); }
+        .progress-bar { width: 100%; height: 12px; background: #222; border-radius: 6px; overflow: hidden; margin-top: 20px; }
+        #progress-fill { height: 100%; background: linear-gradient(90deg, var(--gold), var(--success)); width: 0%; transition: 0.5s; }
+    </style>
+</head>
+<body>
+
+<div id="app">
+    <div id="home-screen" class="screen active">
+        <h1>JURIS DOPAMINA PRO</h1>
+        <div class="panel">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <h2>Mis Bancos de Preguntas</h2>
+                <div style="display:flex; gap:10px;">
+                    <button class="btn btn-outline" onclick="downloadAll()">📥 Descargar</button>
+                    <label class="btn btn-outline">📤 Cargar JSON <input type="file" id="file-input" style="display:none" onchange="importJSON(event)"></label>
+                </div>
+            </div>
+            <div id="block-list"></div>
+            <button class="btn btn-gold" onclick="switchScreen('creator-screen')" style="width:100%; margin-top:20px;">✨ Generar desde Texto / Nuevo Bloque</button>
+        </div>
+    </div>
+
+    <div id="creator-screen" class="screen">
+        <button class="btn btn-outline" onclick="switchScreen('home-screen')">← Volver</button>
+        <div class="panel">
+            <h2>Generador de Memorización</h2>
+            <input type="text" id="new-name" placeholder="Nombre del tema (Ej: Derecho de Familia)" style="width:100%; padding:15px; background:#111; border:1px solid #444; color:white; border-radius:10px; margin-bottom:15px;">
+            <p style="color:#888;">Pega aquí tus apuntes o artículos. El sistema creará preguntas automáticamente.</p>
+            <textarea id="raw-text" placeholder="Ejemplo: La familia es el elemento natural de la sociedad. El parentesco es la relación entre dos personas..."></textarea>
+            <button class="btn btn-gold" onclick="smartGenerate()" style="width:100%; margin-top:20px;">⚡ Generar Preguntas Ahora</button>
+        </div>
+    </div>
+
+    <div id="game-screen" class="screen">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span id="rank" style="color:var(--gold); font-weight:bold;">ESTUDIANTE</span>
+            <span id="counter" style="color:#666"></span>
+        </div>
+        <div class="progress-bar"><div id="progress-fill"></div></div>
+        <div class="q-card" id="q-display"></div>
+        <div id="opt-display"></div>
+        <button class="btn btn-outline" onclick="switchScreen('home-screen')" style="width:100%; margin-top:40px;">Finalizar Sesión</button>
+    </div>
+</div>
+
+<script>
+// --- MOTOR DE DATOS (Autoguardado) ---
+let db = JSON.parse(localStorage.getItem('law_pro_db')) || [];
+
+function save() {
+    localStorage.setItem('law_pro_db', JSON.stringify(db));
+    renderBlocks();
+}
+
+function switchScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    if(id === 'home-screen') renderBlocks();
+}
+
+function renderBlocks() {
+    const cont = document.getElementById('block-list');
+    cont.innerHTML = db.length === 0 ? '<p style="color:#555; text-align:center;">No hay bloques cargados.</p>' : '';
+    db.forEach((b, i) => {
+        cont.innerHTML += `
+            <div style="display:flex; justify-content:space-between; align-items:center; background:#1e1e1e; padding:18px; border-radius:15px; margin-bottom:12px; border:1px solid #333;">
+                <div><b>${b.name}</b><br><small style="color:#00ff88">${b.questions.length} conceptos</small></div>
+                <div>
+                    <button class="btn btn-gold" style="padding:10px" onclick="play(${i})">MEMORIZAR</button>
+                    <button class="btn btn-danger" style="padding:10px" onclick="deleteB(${i})">🗑️</button>
+                </div>
+            </div>`;
+    });
+}
+
+// --- GENERADOR INTELIGENTE DE TEXTO ---
+function smartGenerate() {
+    const text = document.getElementById('raw-text').value;
+    const name = document.getElementById('new-name').value;
+    if(!text || !name) return alert("Llena el nombre y el texto.");
+
+    // Dividir por frases que parecen definiciones
+    const lines = text.split(/[.\n;]/);
+    let qs = [];
+
+    lines.forEach(l => {
+        const line = l.trim();
+        if(line.length < 15) return;
+
+        // Patrón "X es Y" o "X: Y" o "X son Y"
+        let splitters = [/ es /i, / son /i, /: /];
+        let parts = null;
+
+        for(let reg of splitters) {
+            if(line.match(reg)) {
+                parts = line.split(reg);
+                break;
+            }
+        }
+
+        if(parts && parts.length >= 2) {
+            qs.push({
+                q: `¿Qué define el texto sobre "${parts[0].trim()}"?`,
+                o: [parts[1].trim(), "Un concepto erróneo según la norma", "Una definición nula o inexistente"],
+                a: 0
+            });
+        }
+    });
+
+    if(qs.length === 0) return alert("No pude extraer preguntas. Asegúrate de usar el formato 'Concepto es Definición'.");
+
+    db.push({ name: name, questions: qs });
+    save();
+    document.getElementById('raw-text').value = '';
+    switchScreen('home-screen');
+    confetti({ particleCount: 150, spread: 70 });
+}
+
+// --- CARGAR ARCHIVOS (Adaptado a tu JSON de Familia) ---
+function importJSON(e) {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+        try {
+            const data = JSON.parse(event.target.result);
+            let importedQs = [];
+            
+            // Si el JSON tiene el formato de "temas" como el tuyo:
+            if(data.temas) {
+                data.temas.forEach(tema => {
+                    tema.preguntas.forEach(p => {
+                        importedQs.push({ q: p.pregunta, o: [p.respuesta, "Definición alternativa incorrecta", "Información no estipulada"], a: 0 });
+                    });
+                });
+                db.push({ name: data.modulo || "Importado", questions: importedQs });
+            } else {
+                // Formato estándar
+                db = data;
+            }
+            save();
+            alert("✅ ¡Cargado correctamente!");
+        } catch(err) { alert("Error al leer el archivo. Verifica el formato."); }
+    };
+    reader.readAsText(e.target.files[0]);
+}
+
+function downloadAll() {
+    const blob = new Blob([JSON.stringify(db, null, 2)], {type: "application/json"});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = "mi_banco_derecho.json";
+    a.click();
+}
+
+function deleteB(i) { if(confirm("¿Eliminar bloque?")) { db.splice(i,1); save(); } }
+
+// --- JUEGO (DOPAMINA) ---
+let activeB = null;
+let qIdx = 0;
+
+function play(i) {
+    activeB = db[i];
+    qIdx = 0;
+    switchScreen('game-screen');
+    renderQ();
+}
+
+function renderQ() {
+    const q = activeB.questions[qIdx];
+    document.getElementById('q-display').innerText = q.q;
+    document.getElementById('counter').innerText = `${qIdx + 1} / ${activeB.questions.length}`;
+    
+    const progress = (qIdx / activeB.questions.length) * 100;
+    document.getElementById('progress-fill').style.width = progress + "%";
+    
+    if(progress > 70) document.getElementById('rank').innerText = "DOCTOR";
+    else if(progress > 30) document.getElementById('rank').innerText = "LICENCIADO";
+
+    const cont = document.getElementById('opt-display');
+    cont.innerHTML = '';
+    
+    let opts = q.o.map((t, i) => ({t, i})).sort(() => Math.random() - 0.5);
+    opts.forEach(o => {
+        const b = document.createElement('button');
+        b.className = 'opt-btn';
+        b.innerText = o.t;
+        b.onclick = () => {
+            if(o.i === 0) {
+                confetti({ particleCount: 50, spread: 60, colors: ['#ffcc00', '#ffffff'] });
+                qIdx++;
+                if(qIdx < activeB.questions.length) setTimeout(renderQ, 500);
+                else { alert("¡MAESTRÍA COMPLETADA!"); switchScreen('home-screen'); }
+            } else {
+                b.style.borderColor = "var(--error)";
+                b.animate([{transform:'translateX(5px)'},{transform:'translateX(-5px)'}], {duration:100, iterations:3});
+            }
+        };
+        cont.appendChild(b);
+    });
+}
+
+renderBlocks();
+</script>
+</body>
+</html>
+    <script src="/script.js"></script>
+  </body>
+
+</html>
